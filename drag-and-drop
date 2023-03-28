@@ -53,119 +53,40 @@
     </style>
   </head>
   <body>
-    <h1>Drag and scroll disambiguation</h1>
-    <p>On mobile dragging is an overloaded operation. This demo explores two ways it should be possible to drag on long press and not interfere with scrolling on an immediate drag.</p>
+    <h1>Drag and drop (move and copy) demonstration</h1>
+    <p>Currently implements move and copy by faking a transform.  Drag and drop events are only used to track motion.</p>
     <p>Spoiler: Neither of these work, but should they?</p>
-    <div class="target timeoutmenudrag">Drags after timeout</div>
-    <div class="target contextmenudrag">Drags on contextmenu (i.e. longpress)</div>
-    <div draggable="true" class="target dragstartdrag">Drags on dragstart</div>
+    <div draggable="true" class="target dragmove">Drags - Move</div>
+    <div draggable="true" class="target dragcopy">Drags - Copy</div>
     <div id="log">Events logged here ^</div>
     <div class="spacer"></div>
   </body>
   <script>
   function init() {
-    let targets = document.querySelectorAll('.contextmenudrag');
+    let targets = document.querySelectorAll('.dragmove');
     for (let i = 0; i < targets.length; i++)
-      setupContextMenuDragListeners(targets[i]);
-    targets = document.querySelectorAll('.timeoutmenudrag');
+      setupDragListeners(targets[i], true);
+    targets = document.querySelectorAll('.dragcopy');
     for (let i = 0; i < targets.length; i++)
-      setupTouchMenuDragListeners(targets[i]);
-    targets = document.querySelectorAll('.dragstartdrag');
-    for (let i = 0; i < targets.length; i++)
-      setupDragStartDragListeners(targets[i]);
+      setupDragListeners(targets[i], false);
   }
 
-  function setupContextMenuDragListeners(target) {
+  function setupDragListeners(target, move) {
     let pos = [0, 0];
     let lastEvent = null;
-    target.addEventListener('contextmenu', (evt) => {
-      log(evt);
-      evt.preventDefault();
-      lastEvent = [evt.clientX, evt.clientY];
-      target.classList.add('dragging');
-    });
-    target.addEventListener('touchstart', (evt) => {
-      log(evt);
-    });
-    target.addEventListener('touchmove', (evt) => {
-      log(evt);
-      if (!lastEvent) {
-        return;
-      }
-      let cur = [evt.touches[0].clientX, evt.touches[0].clientY];
-      pos[0] += cur[0] - lastEvent[0];
-      pos[1] += cur[1] - lastEvent[1];
-      lastEvent = cur;
-      target.style.transform = `translate(${pos[0]}px, ${pos[1]}px)`;
-
-      evt.preventDefault();
-    });
-    target.addEventListener('touchend', (evt) => {
-      if (!lastEvent)
-        return;
-      log(evt);
-      lastEvent = null;
-      target.classList.remove('dragging');
-      evt.preventDefault();
-    });
-  }
-  function setupTouchMenuDragListeners(target) {
-    let pos = [0, 0];
-    let lastEvent = null;
-    let downTime = null;
-    const LONGPRESS_TIMEOUT = 500;
-    let longpressTimer = 0;
-    let cancelTimer = function() {
-      if (!longpressTimer)
-        return;
-      clearTimeout(longpressTimer);
-      longpressTimer = 0;
-    }
-    target.addEventListener('contextmenu', (evt) => {
-      log(evt);
-      evt.preventDefault();
-    });
-    target.addEventListener('touchstart', (evt) => {
-      log(evt);
-      lastEvent = [evt.touches[0].clientX, evt.touches[0].clientY];
-      downTime = evt.timeStamp;
-      longpressTimer = setTimeout(() => {
-        target.classList.add('dragging');
-        longpressTimer = 0;
-      }, LONGPRESS_TIMEOUT);
-    });
-    window.addEventListener('scroll', () => {
-      // Scrolling cancels dragging.
-      cancelTimer();
-      lastEvent = null;
-    });
-    target.addEventListener('touchmove', (evt) => {
-      log(evt);
-      if (!lastEvent || evt.timeStamp - downTime < LONGPRESS_TIMEOUT) {
-        return;
-      }
-      let cur = [evt.touches[0].clientX, evt.touches[0].clientY];
-      pos[0] += cur[0] - lastEvent[0];
-      pos[1] += cur[1] - lastEvent[1];
-      lastEvent = cur;
-      target.style.transform = `translate(${pos[0]}px, ${pos[1]}px)`;
-
-      evt.preventDefault();
-    });
-    target.addEventListener('touchend', (evt) => {
-      log(evt);
-      cancelTimer();
-      if (!lastEvent)
-        return;
-      lastEvent = null;
-      target.classList.remove('dragging');
-      evt.preventDefault();
-    });
-  }
-  function setupDragStartDragListeners(target) {
-    let pos = [0, 0];
-    let lastEvent = null;
+    let duplicate = null; // stores the copy 
     target.addEventListener('dragstart', (evt) => {
+        if (!move) {
+            duplicate = target.cloneNode(true);
+            target.parentNode.insertBefore(duplicate, target.nextSibling);
+            duplicate.textContent = "Duplicate (inert)";
+            let newTop = target.getBoundingClientRect().top - duplicate.offsetTop;
+            let newLeft = target.getBoundingClientRect().left - duplicate.offsetLeft;
+            duplicate.style = "position:absolute";
+            duplicate.style.transform = `translate(${newLeft}px, ${newTop}px)`;
+            //duplicate.left = newLeft;
+            //duplicate.top = newTop;
+        }
       // Pass an empty drag image.
       var img = document.createElement('img');
       img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
@@ -176,7 +97,7 @@
     });
     target.addEventListener('drag', (evt) => {
       log(evt);
-      if (!lastEvent)
+      if (!lastEvent) 
         return;
       // Why do we get this?
       if (evt.clientX == 0 && evt.clientY == 0)
@@ -196,13 +117,15 @@
       lastEvent = null;
       evt.preventDefault();
       target.classList.remove('dragging');
+      //if (duplicate)
+        //setupDragListeners(duplicate, false);
     });
   }
 
   const MAX_EVENTS=5;
   let events = [];
   function log(evt) {
-    console.log(evt);
+ //   console.log(evt);
     let logEl = document.getElementById('log');
     if (events.length >= MAX_EVENTS)
       events.splice(MAX_EVENTS, events.length);
